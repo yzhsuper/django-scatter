@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+
+<a id="logout" href="javascript:;">logout</a>
+<a id="login" href="javascript:;">login</a>
+<div id="d1">
+    {% if request.user.is_authenticated %}hello: {{ request.user.username }}{% endif %}
+</div>
+<script type="text/javascript" src="/static/js/jquery.min.js"></script>
+<script src="https://cdn.scattercdn.com/file/scatter-cdn/js/latest/scatterjs-core.min.js"></script>
+<script type="text/javascript">
+
+    var signup = '';
+    var fields = ['email'];
+    var public_key_field_name = 'username';
+
+    const main_network = {
+        blockchain: 'eos',
+        protocol: 'http',
+        host: '',
+        port: 0,
+        chainId: ''
+    };
+
+    ScatterJS.scatter.connect("test").then(connected => {
+        if (!connected) return false;
+        window.scatter_core = ScatterJS.scatter;
+        window.ScatterJS = null;
+        window.scatter = null;
+    });
+
+    $("#login").on('click', function () {
+        if (scatter_core.identity) {
+            web_login();
+        } else {
+            requestIdentity(fields, public_key_field_name, signup, main_network, console.log);
+        }
+    });
+    $("#logout").on('click', function () {
+        scatter_core.forgetIdentity();
+    });
+
+    async function requestIdentity(requiredFields, pubkeyFieldName, signup_url, network, onIdentityReject) {
+        let identitySettings = {
+            personal: ['firstname'],
+        };
+        if (network) {
+            await scatter_core.suggestNetwork(network);
+            identitySettings['accounts'] = [network];
+        }
+
+        scatter_core.getIdentity(identitySettings).then((identity) => {
+            console.log(identity);
+            web_login();
+        }).catch(error => {
+            console.log("Identity or Network was rejected");
+            if (typeof onIdentityReject === 'function') {
+                onIdentityReject(error);
+            }
+        })
+    }
+
+    function random12() {
+
+        var arr = [];//容器
+        for (var i = 0; i < 12; i++) {//循环六次
+            var num = Math.random() * 9;
+            num = parseInt(num, 10);
+            arr.push(num);
+        }
+        return arr.join('');
+    }
+
+    function web_login() {
+        var sign_data = random12();
+        var toSign = 'local.test';
+        toSign = scatter_core.identity.accounts[0].name;
+        console.log(toSign);
+        console.log(scatter_core.identity.publicKey);
+
+        scatter_core.authenticate(sign_data, toSign)
+            .then(res => {
+                $.post('/api/v1/sign_up', {
+                    'sign': res,
+                    'public_key': scatter_core.identity.publicKey,
+                    'name': scatter_core.identity.accounts[0].name,
+                    'sign_data': sign_data,
+                    'to_sign': toSign,
+                    'source': 1,
+                }, function (data) {
+                    if (data['succ']) window.location.reload();
+                });
+            }).catch(err => {
+            console.log('err', err);
+        });
+    }
+
+</script>
+</body>
+</html>
